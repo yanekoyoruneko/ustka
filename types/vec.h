@@ -3,7 +3,6 @@
 */
 
 /* TODO: vec_pop, vec_del and shrink */
-#define VEC_GROW 1.5
 #define VEC_INI_CAP 16
 
 /* because vec can be of any type these have to be macros */
@@ -48,7 +47,7 @@ vec_init_(void **data, size_t els, size_t siz) /* for assigment operation in VEC
  */
 #define vec_ensure(data, siz) do {                                             \
 	if (vec_len(data) + (siz) > vec_cap(data)) {                           \
-		vecptr(data)->cap = vec_len(data) * VEC_GROW;                  \
+		vecptr(data)->cap = vec_len(data) << 1;                        \
 		if (vec_len(data) + (siz) > vec_cap(data))                     \
 			vecptr(data)->cap = vec_len(data) + (siz);             \
 		data = vecdata(realloc(vecptr(data), vec_siz(data)));          \
@@ -60,5 +59,5 @@ vec_init_(void **data, size_t els, size_t siz) /* for assigment operation in VEC
 /* but because it's more convenient to insert literal elements it is a macro */
 #define vec_push(data, el) do {					               \
 	vec_ensure(data, 1);		                                       \
-	data[vecptr(data)->len++] = el;	                                       \
+	(data)[vecptr(data)->len++] = el;                             	       \
 } while (0)

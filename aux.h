@@ -1,11 +1,12 @@
 #if 0
+# Hail Plan9
 set -xe
 
 SRC="read.c prog.c"
 BIN="prog"
 
 CPPFLAGS="-D_DEFAULT_SOURCE"
-CFLAGS="-ggdb -std=c99 -pedantic -Wextra -Wall $CPPFLAGS"
+CFLAGS="-ggdb -std=c11 -pedantic -Wextra -Wall $CPPFLAGS"
 LDFLAGS=""
 CC="cc"
 
@@ -56,7 +57,7 @@ typedef long long          vlong;
 typedef unsigned long      ulong;
 typedef unsigned long long uvlong;
 
-#define nil               NULL
+#define nil               ((void*)0)
 #define nelem(x)          (sizeof(x) / sizeof(*x))
 #define entryof(p, t, m)  (t *)((char *)(p) - offsetof(t, m))
 #define max(x, y)         ((x) > (y) ? (x) : (y))
@@ -132,8 +133,8 @@ void aux_trace_(const char *file, int line, char *fmt, ...);
 
 extern void *aux_tmp;
 #define aux_alloc(fn, ...) (aux_tmp = fn(__VA_ARGS__) ? aux_tmp : (exits(#fn), nil))
-#define emalloc(...)  aux_alloc(malloc, __VA_ARGS__)
-#define ecalloc(...)  aux_alloc(calloc, __VA_ARGS__)
+#define emalloc(...)  aux_alloc(malloc,  __VA_ARGS__)
+#define ecalloc(...)  aux_alloc(calloc,  __VA_ARGS__)
 #define erealloc(...) aux_alloc(realloc, __VA_ARGS__)
 
 #ifdef AUX_IMPL

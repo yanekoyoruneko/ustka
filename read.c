@@ -38,12 +38,10 @@ const char *READ_ERR[] = {
 	[UNMATCHED_SKET_ERR]     = "unmatched close square bracket",
 };
 
-/* 'nextitem` either returns token from this enum or Cell pointer
- * the NIL is reserved for returning NULL/nil in error case */
 /* BRA is opening, KET is closing parenthesis */
 typedef enum {
 	EOF2 = EOF,
-	NIL = 0,
+	ERR,
 	BRA,
 	KET,
 	SBRA,
@@ -52,6 +50,7 @@ typedef enum {
 	DOT,
 	QUOTE,
 	BSTICK,
+	VAL,
 } Token;
 
 
@@ -85,7 +84,7 @@ ropen(const char *fname)
 	}
 	else if (!(reader->input = fopen(fname, "r"))) {
 		perror("ropen:");
-		return nil;
+		return NULL;
 	}
 	reader->fname = fname;
 	return reader;
@@ -125,38 +124,36 @@ rungetc(Reader *reader, char chr)
 }
 
 static size_t
-readstr(Reader *reader, Vec(char) str)
+readstr(Reader *reader, Vec(char) *str)
 {
 	char chr;
 	int esc = 0;
 	size_t pos = reader->cursor;
 	while ((chr = rgetc(reader)) != EOF) {
-		if (esc) {
-			esc = 0;
-			switch (chr) {
-			case '\\': vec_push(str, chr); continue;
-			case '"': vec_push(str, chr);  continue;
-			case 'n': vec_push(str, '\n'); continue;
-			case 't': vec_push(str, '\t'); continue;
+		if (esc) { esc = 0; switch (chr) {
+			case 'n':  vec_push(*str, '\n'); continue;
+			case 'r':  vec_push(*str, '\r'); continue;
+			case 't':  vec_push(*str, '\t'); continue;
+			default:   vec_push(*str, chr);  continue;
 			}
 		} else if (chr == '"') break;
 		if ((esc = (chr == '\\'))) continue;
-		vec_push(str, chr);
+		vec_push(*str, chr);
 	}
-	vec_push(str, '\0');
+	vec_push(*str, '\0');
 	return reader->cursor - pos;
 }
 
 static size_t
-readsym(Reader *reader, Vec(char) str)
+readsym(Reader *reader, Vec(char) *str)
 {
 	char chr;
 	size_t pos = reader->cursor;
 	while (!istermsexp(chr = rgetc(reader))) {
-		vec_push(str, chr);
+		vec_push(*str, chr);
 	}
 	rungetc(reader, chr);
-	vec_push(str, '\0');
+	vec_push(*str, '\0');
 	return reader->cursor - pos;
 }
 
@@ -180,68 +177,64 @@ skipcom(Reader *reader)
 	return chr;
 }
 
-static Cell *			/* todo split string parsing routines */
-nextitem(Arena *arena, Reader *reader)
+static Token
+nextitem(Arena *arena, Reader *reader, Value *val)
 {
 	char chr;
-	chr = skipcom(reader);
-	switch (chr) {
-        case '(':  return (Cell *)BRA;
-	case ')':  return (Cell *)KET;
-	case '[':  return (Cell *)SBRA;
-        case ']':  return (Cell *)SKET;
-        case '\'': return (Cell *)QUOTE;
-        case '`':  return (Cell *)BSTICK;
-        case '.':  return (Cell *)DOT;
-        case '#':  return (Cell *)HASH;
+	switch (chr = skipcom(reader)) {
+        case '(':  return BRA;
+	case ')':  return KET;
+	case '[':  return SBRA;
+        case ']':  return SKET;
+        case '\'': return QUOTE;
+        case '`':  return BSTICK;
+        case '.':  return DOT;
+        case '#':  return HASH;
 	case EOF:
 		reader->err = (ReadErr){EOF_ERR, reader->cursor};
-		return (Cell *)EOF2;
+		return EOF;
 	case '"': {		/* todo: test string */
 		VEC(char, str);
-		Cell *cell = cellof(arena, A_ATOM, reader->cursor - 1);
-		cell->type = A_STR;
-		cell->string = nil;
-		CELL_LEN(cell) = readstr(reader, str) + 1 /* + " */;
+		/* CELL_LEN(cell) */
+		readstr(reader, &str); // + 1 /* 1+ for quote */;
 		if (feof(reader->input)) {
 			vec_free(str);
 			reader->err = (ReadErr){EOF_ERR, reader->cursor};
-			return nil;
+			return ERR;
 		}
-		cell->string = new(arena, strlen(str) + 1);
-		strcpy(cell->string, str);
+		*val = TO_STR(new(arena, strlen(str) + 1));
+		strcpy(AS_PTR(*val), str);
 		vec_free(str);
-		return cell;
- 	} default:		/* todo: add double */
-		  rungetc(reader, chr);
-		  VEC(char, sym);
-		  Cell *cell = cellof(arena, A_ATOM, reader->cursor);
-		  CELL_LEN(cell) = readsym(reader, sym);
-		  char *endptr;
-		  /* if looks like number it's number */
-		  cell->integer = strtol(sym, &endptr, 10);
-		  if (*endptr == '\0') {
-			  vec_free(sym);
-			  cell->type = A_INT;
-			  return cell;
-
-		  }
-		  cell->type = A_SYM;
-		  cell->string = new(arena, strlen(sym) + 1);
-		  strcpy(cell->string, sym);
-		  vec_free(sym);
-		  return cell;
+		return VAL;
+	}
+	default:		/* todo: add double */
+		rungetc(reader, chr);
+		VEC(char, sym);
+		/* CELL_LEN(cell) = */
+		readsym(reader, &sym);
+		char *endptr;
+		/* if looks like number it's number */
+		*val = TO_INT(strtol(sym, &endptr, 10));
+		if (*endptr == '\0') {
+			vec_free(sym);
+			return VAL;
+		}
+		*val = TO_SYM(new(arena, strlen(sym) + 1));
+		strcpy(AS_PTR(*val), sym);
+		vec_free(sym);
+		return VAL;
 	}
 }
 
 
 /* ;; READ SEXP ;; */
 /* -es stands for (e)S-expression */
-static Cell * reades_(Arena *arena, Reader *reader);
+static Value reades_(Arena *arena, Reader *reader);
 
 static void
 discardsexp(Arena *arena, Reader *reader) {
-	Cell *item;
+	Value item;
+	Token tk;
 	ReadErr err = reader->err;
 	int depth = 0;
 	/* because NOTHING_AFTER_DOT_ERR consumes KET synchronization can be omited */
@@ -249,41 +242,42 @@ discardsexp(Arena *arena, Reader *reader) {
 	    reader->err.type == EOFU_ERR ||
 	    reader->err.type == NOTHING_AFTER_DOT_ERR)
 		return;
-	while ((item = nextitem(arena, reader)) != (Cell *)EOF2) {
-		if (item == (Cell *)BRA) depth++;
-		else if (item == (Cell *)KET) depth--;
+	while ((tk = nextitem(arena, reader, &item)) != EOF) {
+		if (tk == BRA) depth++;
+		else if (tk == KET) depth--;
 		if (depth < 0) break;
 	}
 	reader->err = err;
 }
 
-static Cell * /* todo: implement all tokens / make area size fixed? */
+static Value /* todo: implement all tokens / make area size fixed? */
 readrest(Arena *arena, Reader *reader)
 {
-	Cell *tl = nil;
-	Cell *hd = nil;
-	Cell *errel = nil;
+	Value tl = NIL;
+	Value hd = NIL;
+	Value errel = NIL;
 	size_t begcur = reader->cursor - 1;
-	Cell *item = nextitem(arena, reader);
-	while (item != (Cell *)KET) {
-		switch ((uint64_t)item) {
-		case EOF2:	/* this is unexpected EOF, make it unexpected */
+	Token tk;
+	Value item;
+	while ((tk = nextitem(arena, reader, &item)) != KET) {
+		switch (tk) {
+		case EOF:	/* this is unexpected EOF, make it unexpected */
 			reader->err.type = EOFU_ERR;
-			return nil;
+			return NIL;
 		case BRA:
 			item = readrest(arena, reader);
 			if (reader->err.type) {
 				discardsexp(arena, reader);
-				return nil;
+				return NIL;
 			}
 			break;
 		case DOT:  /* expected is DOT <sexp> KET, otherwise error */
-			if (!tl) {
+			if (NILP(tl)) {
 				reader->err = (ReadErr){
 					NOTHING_BEFORE_DOT_ERR,
 					reader->cursor - 1
 				};
-				return nil;
+				return NIL;
 			}
 			size_t prevcur = reader->cursor - 1;
 			CDR(tl) = reades_(arena, reader);
@@ -294,7 +288,7 @@ readrest(Arena *arena, Reader *reader)
 						prevcur,
 					};
 				}
-				return nil;
+				return NIL;
 			}
 			/*
 			 * `reades_' is used here because it doesn't consume KET
@@ -302,44 +296,47 @@ readrest(Arena *arena, Reader *reader)
 			 * consumed by `discardsexp' on synchronization
 			 */
 			prevcur = reader->err.at;
-			if ((errel = reades_(arena, reader)) != nil) {
+			if (!NILP(errel = reades_(arena, reader))) {
 				reader->err = (ReadErr){
 					DOT_MANY_FOLLOW_ERR,
-					CELL_AT(errel),
+					0
+					/* CEL_AT(errel), */
 				};
-				return nil;
+				return NIL;
 			}
 			if (reader->err.type != UNMATCHED_KET_ERR)
-				return nil; /* propagate further same error */
+				return NIL; /* propagate further same error */
 			reader->err = (ReadErr){OK, prevcur}; /* proper sexp */
-			if (hd) CELL_LEN(hd) = reader->cursor - begcur;
+			if (!NILP(hd)) CEL_LEN(hd) = reader->cursor - begcur;
 			return hd;
+		default: break;
 		}
-		Cell *cell = cons(arena, item, nil, begcur);
-		if (!hd) hd = cell;
+		Value cell = econs(arena, item, NIL);
+		CEL_AT(cell) = begcur;
+		if (NILP(hd)) hd = cell;
 		else CDR(tl) = cell;
 		tl = cell;
-		item = nextitem(arena, reader);
 	}
-	if (hd) CELL_LEN(hd) = reader->cursor - begcur;
+	if (!NILP(hd)) CEL_LEN(hd) = reader->cursor - begcur;
 	return hd;
 }
 
-static Cell *
+static Value
 reades_(Arena *arena, Reader *reader)
 {
-	Cell *item = nextitem(arena, reader);
-	switch ((uint64_t)item) {
-	case EOF2: return nil;
-	case 0:    return nil;
+	Value item;
+	Token tk;
+	switch (tk = nextitem(arena, reader, &item)) {
 	case BRA: {
-		Cell *cell = readrest(arena, reader);
+		Value cell = readrest(arena, reader);
 		if (reader->err.type) discardsexp(arena, reader);
 		return cell;
 	}
-	case KET:  reader->err = (ReadErr){UNMATCHED_KET_ERR,  reader->cursor - 1}; return nil;
-	case SKET: reader->err = (ReadErr){UNMATCHED_SBRA_ERR, reader->cursor - 1}; return nil;
-	case DOT:  reader->err = (ReadErr){DOT_CONTEXT_ERR,    reader->cursor - 1}; return nil;
+	case KET:  reader->err = (ReadErr){UNMATCHED_KET_ERR,  reader->cursor - 1}; return NIL;
+	case SKET: reader->err = (ReadErr){UNMATCHED_SBRA_ERR, reader->cursor - 1}; return NIL;
+	case DOT:  reader->err = (ReadErr){DOT_CONTEXT_ERR,    reader->cursor - 1}; return NIL;
+	case EOF:  return NIL;
+	case ERR:  return NIL;
 	default:   return item;
 	}
 }
@@ -364,38 +361,3 @@ sexpfree(Sexp *sexp)
 
 
 /* ;; PRINTER ;; */
-static void
-printes_(Cell *cell) {
-	if (!cell) { printf("nil"); return; }
-#ifdef PRINTES_LOCATION
-	printf(RANGEFMT, RANGEP(CELL_LOC(cell)));
-#endif
-	if (CONSP(cell)) {
-		putchar('(');
-		printes_(CAR(cell));
-		while (CONSP(CDR(cell)))  {
-			putchar(' ');
-			cell = CDR(cell);
-			printes_(CAR(cell));
-		};
-		if (ATOMP(CDR(cell))) {
-			fputs(" . ", stdout);
-			printes_(CDR(cell));
-		}
-		putchar(')');
-		return;
-	}
-	if (ATOMP(cell)) {
-		switch (cell->type) {
-		case A_STR: printf("\"%s\"", cell->string); break;
-		case A_SYM: printf("%s", cell->string);     break;
-		case A_INT: printf("%d", cell->integer);    break;
-		case A_DOUBL: printf("%f", cell->doubl);    break;
-		case A_VEC: assert(0 && "unimplemented");   break;
-		}
-		return;
-	}
-	assert(0 && "unreachable");
-}
-
-void printes(Sexp *sexp) { printes_(sexp->cell); }

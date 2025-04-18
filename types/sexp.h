@@ -24,14 +24,12 @@
  * | 1[N]11|00..... | INTEGER
  * | 1[N]11|01..... | NIL (empty list)
  * | 1[N]11|10...XX | CHARACTER
- * | 1[N]11|11...XX | METADATA
  * | 1[N]11|11....X | BOOLEAN
  *              ..1 - T
  *              ..0 - F
  */
+#define PRINTES_LOC   1
 
-
-#include <stdint.h>
 #define QNAN	      0x7ffc000000000000
 #define PTR_TAG_MASK  0xffff000000000000
 #define CEL_MASK      0x7ffc000000000000
@@ -44,11 +42,11 @@
 
 #define NPTR_TAG_MASK 0xfffff00000000000
 #define INT_MASK      0xffff000000000000
-#define MET_MASK      0xffff000000000000
 #define NIL_MASK      0xffff100000000000
 #define BOL_MASK      0xffff200000000000
 #define T_MASK        0xffff200000000001
 #define F_MASK        0xffff200000000000
+
 
 /* predicates */
 #define DUBP(v) ((v.as_uint64 & QNAN) != QNAN)
@@ -62,7 +60,7 @@
 #define BOLP(v) ((v.as_uint64 & NPTR_TAG_MASK) == BOL_MASK)
 #define METP(v) ((v.as_uint64 & NPTR_TAG_MASK) == MET_MASK)
 #define NUMP(v) (INTP(v) || DUBP(v))
-#define NILP(v) (v.as_uint64 == NIL_MASK)
+#define NILP(v) ((v).as_uint64 == NIL_MASK)
 #define ATMP(v) (!CELP(v))
 
 /* get value */
@@ -76,8 +74,7 @@
 
 #define AS_DUB(v) (v.as_double)
 #define AS_BOL(v) (v.as_byte)
-#define AS_INT(v) (v.as_uint32)
-#define AS_MET(v) (AS_INT(v))
+#define AS_INT(v) (v.as_int32)
 
 #define NIL       ((Value){.as_uint64 = NIL_MASK})
 #define T         ((Value){.as_uint64 = T_MASK})
@@ -86,6 +83,9 @@
 /* cell */
 #define CAR(p)    (AS_CEL(p)->car_)
 #define CDR(p)    (AS_CEL(p)->cdr_)
+#define CEL_LOC(p) (*(Range*)(AS_CEL(p)+1))
+#define CEL_LEN(p) (CEL_LOC(p).len)
+#define CEL_AT(p)  (CEL_LOC(p).at)
 
 /* add tag mask */
 #define TO_DUB(d) ((Value){.as_double = d})
@@ -95,7 +95,6 @@
 #define TO_VEC(p) ((Value){.as_uint64 = (uint64_t)(p) | VEC_MASK})
 #define TO_TAB(p) ((Value){.as_uint64 = (uint64_t)(p) | TAB_MASK})
 #define TO_FUN(p) ((Value){.as_uint64 = (uint64_t)(p) | FUN_MASK})
-#define TO_MET(p) ((Value){.as_uint64 = (uint64_t)(p) | MET_MASK})
 #define TO_INT(i) ((Value){.as_uint64 = (uint64_t)(uint32_t)(i) | INT_MASK}) /* zero-extend negative */
 
 #define TYPE_ERR(type, val)						\
@@ -118,6 +117,7 @@ typedef struct {
 
 typedef union {
 	uint8_t  as_byte;
+	int32_t  as_int32;
 	uint32_t as_uint32;
 	uint64_t as_uint64;
 	double   as_double;
@@ -135,9 +135,18 @@ typedef struct {
 } Sexp;
 
 static inline Value
-cons(Arena *arena, Value a, Value b, size_t at)
+cons(Arena *arena, Value a, Value b)
 {
-	Value cell = TO_CEL(new(arena, at));
+	Value cell = TO_CEL(new(arena, sizeof(Cell)));
+	CAR(cell) = a;
+	CDR(cell) = b;
+	return cell;
+}
+
+static inline Value
+econs(Arena *arena, Value a, Value b)
+{
+	Value cell = TO_CEL(new(arena, sizeof(Cell) + sizeof(Range)));
 	CAR(cell) = a;
 	CDR(cell) = b;
 	return cell;
@@ -150,9 +159,9 @@ valuestr(Value val)
 	if      (INTP(val)) snprintf(buff, BUFSIZ, "%d", AS_INT(val));
 	else if (DUBP(val)) snprintf(buff, BUFSIZ, "%f", AS_DUB(val));
 	else if (SYMP(val)) snprintf(buff, BUFSIZ, "%s", AS_PTR(val));
+	else if (STRP(val)) snprintf(buff, BUFSIZ, "\"%s\"", AS_STR(val));
 	else if (BOLP(val)) snprintf(buff, BUFSIZ, "%s", AS_BOL(val) ? "T" : "F");
-	else if (CELP(val)) snprintf(buff, BUFSIZ, "CELL");
-	else if (NILP(val)) snprintf(buff, BUFSIZ, "nil");
+	else if (NILP(val)) snprintf(buff, BUFSIZ, "()");
 	else assert(0 && "valuestr: invalid type; unreachable");
 	return buff;
 }
@@ -160,6 +169,9 @@ valuestr(Value val)
 inline static void
 printes_(Value cell) {
 	if (CELP(cell)) {
+#ifdef PRINTES_LOC
+		printf(RANGEFMT, RANGEP(CEL_LOC(cell)));
+#endif
 		putchar('(');
 		printes_(CAR(cell));
 		while (CELP(CDR(cell)))  {
@@ -177,4 +189,4 @@ printes_(Value cell) {
 	printf("%s", valuestr(cell));
 }
 
-void printes(Sexp *sexp) { printes_(sexp->cell); }
+inline static void printes(Sexp *sexp) { printes_(sexp->cell); }

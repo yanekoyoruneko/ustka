@@ -6,7 +6,7 @@
 
 void usage() { printf("error\n"); }
 
-int main_(int argc, char *argv[]) {
+int main(int argc, char *argv[]) {
 	Reader *reader = ropen(NULL);
 	Sexp *sexp;
 	ARGBEGIN {
@@ -15,7 +15,7 @@ int main_(int argc, char *argv[]) {
 	for (int i = 0; i < 3; i++) {
 		sexp = reades(reader);
 		if (readerr(reader)) {
-			fprintf(stderr, "%s\n", readerr(reader));
+			fprintf(stderr, "%ld: %s\n", readerrat(reader), readerr(reader));
 		} else {
 			printes(sexp);
 			fflush(stdout);

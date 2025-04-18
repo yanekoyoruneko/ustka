@@ -2,7 +2,7 @@
 #include "types/sexp.h"
 */
 
-#define PRINTES_LOCATION 1
+#define PRINT_LOC 0
 
 typedef struct Reader Reader;
 const char *readerr(Reader *reader);

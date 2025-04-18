@@ -24,7 +24,7 @@ typedef union {
 
 /* predicates */
 #define DOUBLP(v) ((v.as_uint & NANISH) != NANISH)
-#define NULLP(v)  ((v.as_uint == NULL_VALUE)
+#define NILP(v)  ((v.as_uint == NULL_VALUE)
 #define BOOLP(v)  ((v.as_uint & BOOL_MASK) == BOOL_MASK)
 #define PTRP(v)   ((v.as_uint & PTR_MASK) == PTR_MASK)
 #define INTP(v)   ((v.as_uint & NANISH_MASK) == INT_MASK)
@@ -66,6 +66,7 @@ valuestr(Value val)
 	else if (DOUBLP(val)) snprintf(buff, BUFSIZ, "%f",     AS_DOUBL(val));
 	else if (STRP(val))   snprintf(buff, BUFSIZ, "\"%s\"", AS_PTR(val));
 	else if (SYMP(val))   snprintf(buff, BUFSIZ, "%s",     AS_PTR(val));
+	else if (NILP(val))   snprintf(buff, BUFSIZ, "nil");
 	else assert(0 && "valuestr: invalid type; unreachable");
 	return buff;
 }

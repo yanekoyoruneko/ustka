@@ -173,7 +173,7 @@ RET:
 	return err;
 }
 
-int main(int argc, char *argv[]) {
+int main_(int argc, char *argv[]) {
 	const char *input = argc > 1 ? argv[1] : NULL;
 	Reader *reader = ropen(input);
 	Sexp *sexp;

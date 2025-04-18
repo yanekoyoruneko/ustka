@@ -3,7 +3,7 @@ CFLAGS   = -ggdb -std=c11 -pedantic -Wextra -Wall ${CPPFLAGS} ${DEBUG}
 LDFLAGS  = ${DEBUG}
 
 BIN = prog
-SRC = read.c prog.c decomp.c compi.c comp.c eval.c
+SRC = prog.c read.c # decomp.c compi.c comp.c eval.c
 OBJ = ${SRC:.c=.o}
 
 all: options ${BIN}
