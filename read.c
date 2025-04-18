@@ -11,7 +11,7 @@ typedef struct {
 	enum {
 		OK,
 		EOF_ERR,
-		EOFU_ERR,	/* unexpected end of input */
+		UNEXPECTED_EOF_ERR,
 		DOT_MANY_FOLLOW_ERR,
 		NOTHING_BEFORE_DOT_ERR,
 		NOTHING_AFTER_DOT_ERR,
@@ -27,7 +27,7 @@ typedef struct {
 const char *READ_ERR[] = {
 	[OK]                  	 = "READER SAYS OK :)",
 	[EOF_ERR]                = "end of file",
-	[EOFU_ERR]             	 = "unexpected end of file",
+	[UNEXPECTED_EOF_ERR]   	 = "unexpected end of file",
 	[DOT_MANY_FOLLOW_ERR]    = "more than one object follows . in list",
 	[NOTHING_BEFORE_DOT_ERR] = "nothing appears before . in list.",
 	[NOTHING_AFTER_DOT_ERR]  = "nothing appears after . in list.",
@@ -239,7 +239,7 @@ discardsexp(Arena *arena, Reader *reader) {
 	int depth = 0;
 	/* because NOTHING_AFTER_DOT_ERR consumes KET synchronization can be omited */
 	if (reader->err.type == EOF_ERR ||
-	    reader->err.type == EOFU_ERR ||
+	    reader->err.type == UNEXPECTED_EOF_ERR ||
 	    reader->err.type == NOTHING_AFTER_DOT_ERR)
 		return;
 	while ((tk = nextitem(arena, reader, &item)) != EOF) {
@@ -262,7 +262,7 @@ readrest(Arena *arena, Reader *reader)
 	while ((tk = nextitem(arena, reader, &item)) != KET) {
 		switch (tk) {
 		case EOF:	/* this is unexpected EOF, make it unexpected */
-			reader->err.type = EOFU_ERR;
+			reader->err.type = UNEXPECTED_EOF_ERR;
 			return NIL;
 		case BRA:
 			item = readrest(arena, reader);
