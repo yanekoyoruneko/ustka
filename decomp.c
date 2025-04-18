@@ -1,6 +1,5 @@
 #include "aux.h"
 #include "types/arena.h"
-#include "types/value.h"
 #include "types/sexp.h"
 #include "types/vec.h"
 #include "types/ht.h"
@@ -72,7 +71,7 @@ decompile_op_(Chunk *chunk, ptrdiff_t offset)
 	case OP_BIND_DYN: return op_comp(chunk, "BIND_DYN", offset, 1);
 	case OP_LOAD_LEX: return op_comp(chunk, "LOAD_LEX", offset, 1);
 	case OP_BIND_LEX: return op_comp(chunk, "BIND_LEX", offset, 1);
-	case OP_CONS:     return op_comp(chunk, "CONS", offset, 1);
+	case OP_LOAD_CONS:return op_comp(chunk, "LOAD_CONS", offset, 1);
 	case OP_RET:      return op_basic("RET", offset);
 	case OP_NEG:      return op_basic("NEG", offset);
 	case OP_ADD:      return op_basic("ADD", offset);

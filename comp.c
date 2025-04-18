@@ -1,6 +1,5 @@
 #include "aux.h"
 #include "types/arena.h"
-#include "types/value.h"
 #include "types/sexp.h"
 #include "types/vec.h"
 #include "types/ht.h"
@@ -13,10 +12,10 @@ static void compile_(Cell *cell, Chunk *chunk);
 
 #if 0
 static void
-compilerest(Cell *cell, Chunk *chunk)
+compilerest(Value cell, Chunk *chunk)
 {
 	if (!cell) return;
-	if (ATOMP(CAR(cell))) {
+	if (ATMP(CAR(cell))) {
 		/* here emit push instructions for all the literal values */
 		if (CAR(cell)->type == A_INT) {
 			emitcons(TO_INT(CAR(cell)->integer), CELL_LOC(CAR(cell)));
@@ -29,11 +28,11 @@ compilerest(Cell *cell, Chunk *chunk)
 }
 
 static void
-compile_(Cell *cell, Chunk *chunk)
+compile_(Value cell, Chunk *chunk)
 {
 	if (!cell) return;
 
-	if (ATOMP(CAR(cell))) {
+	if (ATMP(CAR(cell))) {
 		if (CAR(cell)->type == A_SYM) {
 			if (!strcmp(CAR(cell)->string, "+")) {
 				compilerest(CDR(cell), chunk);
@@ -52,11 +51,11 @@ compile_(Cell *cell, Chunk *chunk)
 Chunk *
 compile(Sexp *sexp)
 {
-	Cell *cell = sexp->cell;
+	Value cell = sexp->cell;
 	Chunk *chunk = chunknew();
 	Comp *comp = compnew(chunk);
 	/* compile_(cell, chunk); */
-	emit(comp, OP_CONS, (Range){0, 0});
+	emit(comp, OP_LOAD_CONS, (Range){0, 0});
 	emitcons(comp, TO_INT(3), (Range){0, 0});
 	/*
 	ht_set(comp->env->lexbind, "val",3);
@@ -65,5 +64,6 @@ compile(Sexp *sexp)
 	emitbind(comp, "val", (Range){0, 0});
 	emitload(comp, "val", (Range){0, 0});
 	emit(comp, OP_RET, (Range){0, 0});
+	compfree(comp);
 	return chunk;
 }

@@ -1,5 +1,4 @@
 #include "aux.h"
-#include "types/value.h"
 #include "types/arena.h"
 #include "types/sexp.h"
 #include "types/vec.h"
@@ -45,6 +44,7 @@ compnew(Chunk *chunk)
 void
 compfree(Comp *comp)
 {
+	envend(comp);
 	free(comp);
 }
 

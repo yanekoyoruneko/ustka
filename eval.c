@@ -1,6 +1,5 @@
 #include "aux.h"
 #include "types/vec.h"
-#include "types/value.h"
 #include "types/arena.h"
 #include "types/sexp.h"
 #include "types/ht.h"
@@ -73,8 +72,8 @@ framedel()
 #define BIN_OP(op) do {							\
 		Value b_ = pop();					\
 		Value a_ = pop();					\
-		if (DOUBLP(a_) || DOUBLP(b_))				\
-			push(TO_DOUBL(AS_NUM(a_) op AS_NUM(b_)));	\
+		if (DUBP(a_) || DUBP(b_))				\
+			push(TO_DUB(AS_NUM(a_) op AS_NUM(b_)));	        \
 		else							\
 			push(TO_INT(AS_INT(a_) op AS_INT(b_)));		\
 	} while (0);
@@ -124,7 +123,7 @@ run()
 			push(vm.sp[slot]);
 			break;
 		}
-		case OP_CONS: {
+		case OP_LOAD_CONS: {
 		        Value val = VM_CONS();
 			push(val);
 			break;
@@ -133,7 +132,7 @@ run()
 			Value val = pop();
 			if (ASSERTV(NUMP, val)) break;
 			if INTP(val) push(TO_INT(-AS_INT(val)));
-			else if DOUBLP(val) push(TO_DOUBL(-AS_DOUBL(val)));
+			else if DUBP(val) push(TO_DUB(-AS_DUB(val)));
 			break;
 		}
 		case OP_ADD: BIN_OP(+); break;
@@ -173,7 +172,7 @@ RET:
 	return err;
 }
 
-int main_(int argc, char *argv[]) {
+int main(int argc, char *argv[]) {
 	const char *input = argc > 1 ? argv[1] : NULL;
 	Reader *reader = ropen(input);
 	Sexp *sexp;

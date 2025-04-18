@@ -100,8 +100,8 @@
 #define TYPE_ERR(type, val)						\
 	printf("; The value\n;\t%s\n; doesn't satisfy predicate\n;\t%s\n", valuestr(val), type)
 
-#define AS_NUM(val) (INTP(val) ? AS_INT(val) :		\
-		     DOUBLP(val) ? AS_DOUBL(val) :	\
+#define AS_NUM(val) (INTP(val) ? AS_INT(val) :	      \
+		     DUBP(val) ? AS_DUB(val) :	      \
 		     (assert(0 && "unreachable"), 0))
 
 #define ASSERTV(type, val) (!type(val) ? (TYPE_ERR(#type, val), 1) : 0)

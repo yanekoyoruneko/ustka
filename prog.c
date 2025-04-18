@@ -6,7 +6,7 @@
 
 void usage() { printf("error\n"); }
 
-int main(int argc, char *argv[]) {
+int main_(int argc, char *argv[]) {
 	Reader *reader = ropen(NULL);
 	Sexp *sexp;
 	ARGBEGIN {

@@ -232,22 +232,25 @@ nextitem(Arena *arena, Reader *reader, Value *val)
 static Value reades_(Arena *arena, Reader *reader);
 
 static void
-discardsexp(Arena *arena, Reader *reader) {
+discardsexp(Arena *arena, Reader *reader)
+{ /* Discard everything until the current sexp ends; closing KET is found. */
 	Value item;
 	Token tk;
-	ReadErr err = reader->err;
+	ReadErr olderr = reader->err;
 	int depth = 0;
 	/* because NOTHING_AFTER_DOT_ERR consumes KET synchronization can be omited */
 	if (reader->err.type == EOF_ERR ||
 	    reader->err.type == UNEXPECTED_EOF_ERR ||
 	    reader->err.type == NOTHING_AFTER_DOT_ERR)
 		return;
-	while ((tk = nextitem(arena, reader, &item)) != EOF) {
-		if (tk == BRA) depth++;
-		else if (tk == KET) depth--;
-		if (depth < 0) break;
+	while (depth >= 0 && (tk = nextitem(arena, reader, &item)) != EOF) {
+		switch (tk) {
+		case BRA: depth++; break;
+		case KET: depth--; break;
+		default: break;
+		}
 	}
-	reader->err = err;
+	reader->err = olderr;
 }
 
 static Value /* todo: implement all tokens / make area size fixed? */

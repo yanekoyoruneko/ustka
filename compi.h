@@ -7,7 +7,7 @@ typedef struct {
 	const char *fname;
 	Vec(uint8_t) code;
 	Vec(Value) conspool;
-	Vec(SerialRange) where;	/* run length encoding */
+	Vec(SerialRange) where;	/* RLE */
 } Chunk;
 
 typedef struct {
@@ -29,7 +29,7 @@ typedef enum {
 	OP_BIND_DYN,
 	OP_LOAD_DYN,
 	OP_LOAD_LEX,
-	OP_CONS,
+	OP_LOAD_CONS,
 	OP_NEG,
 	OP_ADD,
 	OP_SUB,
