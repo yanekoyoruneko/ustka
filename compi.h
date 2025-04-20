@@ -1,21 +1,10 @@
 /* compiler interface */
 
-typedef struct SerialRange SerialRange;
-typedef struct Env Env;
-
-typedef struct {
-	const char *fname;
-	Vec(uint8_t) code;
-	Vec(Value) conspool;
-	Vec(SerialRange) where;	/* RLE */
-} Chunk;
-
-struct Env {
+typedef struct Env {
 	Chunk *chunk;
 	Ht(size_t) binds;
 	struct Env *shadowed;
-};
-
+} Env;
 
 typedef enum {
 	OP_RET,
@@ -41,7 +30,8 @@ Range whereis(Chunk *chunk, ptrdiff_t offset);
 void emitcons(Env *env, Value val, Range pos);
 
 Env *envnew(Env **env);
-void envend(Env **env);
+Chunk *envend(Env **env);
 
+size_t makebind(Env *env, const char *name);
 size_t emitload(Env *env, const char *name, Range pos);
 size_t emitbind(Env *env, const char *name, Range pos);

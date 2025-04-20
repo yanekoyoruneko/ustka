@@ -1,7 +1,7 @@
 #include "aux.h"
 #include "types/arena.h"
-#include "types/sexp.h"
 #include "types/vec.h"
+#include "types/sexp.h"
 #include "types/ht.h"
 #include "read.h"
 #include "compi.h"
@@ -75,6 +75,7 @@ decompile_op_(Chunk *chunk, ptrdiff_t offset)
 	case OP_ADD:      return op_basic("ADD", offset);
 	case OP_SUB:      return op_basic("SUB", offset);
 	case OP_MUL:      return op_basic("MUL", offset);
+	case OP_CALL:      return op_basic("CALL", offset);
 	case OP_DIV:      return op_basic("DIV", offset);
 	default:
 		printf("; Unknown opcode %d\n", instr);
@@ -98,5 +99,9 @@ decompile(Chunk *chunk, const char *name)
 	for (size_t offset = 0; offset < vec_len(chunk->code);)
 		offset = decompile_op_(chunk, offset);
 	printf(";\n");
+	for (size_t i = 0; i < vec_len(chunk->conspool); i++) {
+		if (!FUNP(chunk->conspool[i])) continue;
+		decompile(AS_FUN(chunk->conspool[i])->body, "<FUN>");
+	}
 	printf(";;; [END]\n");
 }

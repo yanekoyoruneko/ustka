@@ -114,7 +114,7 @@ ht_del_hash_(void *data, size_t els, size_t idx)
 
 #define ht_set(ht, key, val) do {                                              \
 	size_t idx = ht_gethash(ht, key);		                       \
-	if (!htptr(ht)->keys[idx]) htptr(ht)->len += 2;			       \
+	if (!htptr(ht)->keys[idx]) htptr(ht)->len += 1;			       \
 	ht_del_hash(ht, idx);						       \
 	htptr(ht)->keys[idx] = strdup(key);				       \
 	ht[idx] = val;					                       \

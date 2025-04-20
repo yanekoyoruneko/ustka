@@ -70,7 +70,7 @@
 #define AS_STR(v) ((char*)AS_PTR(v))
 #define AS_VEC(v) ((Vec*) AS_PTR(v))
 #define AS_TAB(v) ((ht*)  AS_PTR(v))
-#define AS_FUN(v) ((fn *) AS_PTR(v))
+#define AS_FUN(v) ((Fun*) AS_PTR(v))
 
 #define AS_DUB(v) (v.as_double)
 #define AS_BOL(v) (v.as_byte)
@@ -106,6 +106,8 @@
 
 #define ASSERTV(type, val) (!type(val) ? (TYPE_ERR(#type, val), 1) : 0)
 
+#define CHECK_TYPE(type, val) (!type(val) ? (TYPE_ERR(#type, val), 1) : 0)
+
 
 #define RANGEFMT "|%lu:%lu|"
 #define RANGEP(range) range.at, range.len
@@ -129,6 +131,23 @@ typedef struct  {
 } Cell;
 
 typedef struct {
+	Range range;
+	size_t count;
+} SerialRange;
+
+typedef struct {
+	const char *fname;
+	Vec(uint8_t) code;
+	Vec(Value) conspool;
+	Vec(SerialRange) where;	/* RLE */
+} Chunk;
+
+typedef struct {
+	int arrity;
+	Chunk *body;
+} Fun;
+
+typedef struct {
 	const char *fname;
 	Arena *arena;
 	Value cell;
@@ -141,6 +160,15 @@ cons(Arena *arena, Value a, Value b)
 	CAR(cell) = a;
 	CDR(cell) = b;
 	return cell;
+}
+
+static inline Value
+makefun(Chunk *body, int arrity)
+{ /* let's have fun */
+	Fun *fun = malloc(sizeof(Fun));
+	fun->body = body;
+	fun->arrity = arrity;
+	return TO_FUN(fun);
 }
 
 static inline Value
@@ -159,6 +187,7 @@ valuestr(Value val)
 	if      (INTP(val)) snprintf(buff, BUFSIZ, "%d", AS_INT(val));
 	else if (DUBP(val)) snprintf(buff, BUFSIZ, "%f", AS_DUB(val));
 	else if (SYMP(val)) snprintf(buff, BUFSIZ, "%s", AS_PTR(val));
+	else if (FUNP(val)) snprintf(buff, BUFSIZ, "<FUN>");
 	else if (STRP(val)) snprintf(buff, BUFSIZ, "\"%s\"", AS_STR(val));
 	else if (BOLP(val)) snprintf(buff, BUFSIZ, "%s", AS_BOL(val) ? "T" : "F");
 	else if (NILP(val)) snprintf(buff, BUFSIZ, "()");

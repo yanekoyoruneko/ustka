@@ -41,8 +41,8 @@ typedef struct {
 
 static VM vm;
 
-#define VM_INCIP() (*vm.ip++)
-#define VM_CONS() vm.chunk->conspool[VM_INCIP()]
+#define fetch() (*vm.ip++)
+#define imm() (vm.chunk->conspool[fetch()])
 
 void
 enter()
@@ -114,19 +114,19 @@ run()
 		printf(";; EXECUTING...\n");
 #endif
 		uint8_t opcode;
-		switch (opcode = VM_INCIP()) {
+		switch (opcode = fetch()) {
 		case OP_BIND: {
-			size_t slot = AS_INT(VM_CONS());
+			size_t slot = AS_INT(imm());
 			vm.fp->bsp[slot] = peek();
 			break;
 		}
 		case OP_LOAD: {
-			size_t slot = AS_INT(VM_CONS());
+			size_t slot = AS_INT(imm());
 			push(vm.fp->bsp[slot]);
 			break;
 		}
 		case OP_CONS: {
-		        Value val = VM_CONS();
+		        Value val = imm();
 			push(val);
 			break;
 		}
@@ -141,9 +141,13 @@ run()
 		case OP_SUB: BIN_OP(-); break;
 		case OP_MUL: BIN_OP(*); break;
 		case OP_DIV: BIN_OP(/); break;
-		case OP_CALL:
+		case OP_CALL: {
 			enter();
+		        Value fun = pop();
+			vm.ip = AS_FUN(fun)->body->code;
+			vm.fp->bsp -= AS_FUN(fun)->arrity;
 			break;
+		}
 		case OP_RET: {
 			leave();
 			if (vm.ip == nil)  {
@@ -175,12 +179,13 @@ eval(Sexp *sexp)
 	vm.chunk = chunk;
 	vm.ip = chunk->code;
 	decompile(chunk, "EXECUTING");
-	err = run();
+	/* err = run(); */
 RET:
 	chunkfree(chunk);
 	return err;
 }
 
+
 int main(int argc, char *argv[]) {
 	const char *input = argc > 1 ? argv[1] : NULL;
 	Reader *reader = ropen(input);

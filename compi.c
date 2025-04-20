@@ -1,15 +1,9 @@
 #include "aux.h"
 #include "types/arena.h"
-#include "types/sexp.h"
 #include "types/vec.h"
+#include "types/sexp.h"
 #include "types/ht.h"
 #include "compi.h"
-
-struct SerialRange {
-	Range range;
-	size_t count;		/* count of repetitive ranges */
-};
-
 
 void
 chunkfree(Chunk *chunk)
@@ -45,14 +39,17 @@ envnew(Env **env)
 	return new;
 }
 
-void
+Chunk *
 envend(Env **env)
 {
 	ht_free((*env)->binds);
-	chunkfree((*env)->chunk);
+	/* chunkfree((*env)->chunk); */
+	Chunk *last = (*env)->chunk;
 	Env *tofree = *env;
 	*env = (*env)->shadowed;
 	free(tofree);
+	/* --- TODO: Chunk is leaking right now */
+	return last;
 }
 
 void
@@ -95,7 +92,7 @@ findbind(Env *env, const char *name)
 	return -1;
 }
 
-static size_t
+size_t
 makebind(Env *env, const char *name)
 {
 	size_t hash = ht_gethash(env->binds, name);
