@@ -67,11 +67,9 @@ decompile_op_(Chunk *chunk, ptrdiff_t offset)
 
 	uint8_t instr = chunk->code[offset];
 	switch (instr) {
-	case OP_LOAD_DYN: return op_comp(chunk, "LOAD_DYN", offset, 1);
-	case OP_BIND_DYN: return op_comp(chunk, "BIND_DYN", offset, 1);
-	case OP_LOAD_LEX: return op_comp(chunk, "LOAD_LEX", offset, 1);
-	case OP_BIND_LEX: return op_comp(chunk, "BIND_LEX", offset, 1);
-	case OP_LOAD_CONS:return op_comp(chunk, "LOAD_CONS", offset, 1);
+	case OP_LOAD: return op_comp(chunk, "LOAD", offset, 1);
+	case OP_BIND: return op_comp(chunk, "BIND", offset, 1);
+	case OP_CONS:return op_comp(chunk, "LOAD_CONS", offset, 1);
 	case OP_RET:      return op_basic("RET", offset);
 	case OP_NEG:      return op_basic("NEG", offset);
 	case OP_ADD:      return op_basic("ADD", offset);

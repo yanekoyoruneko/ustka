@@ -51,8 +51,9 @@ typedef struct {
 #define htptr(data) ((HT_ *)(data)-1)		   /* internals */
 #define htdata(vec) ((void *)((HT_ *)(vec)+1))
 
-#define ht_ini(data) ht_init(data, HT_INI_CAP)
+#define ht_ini(data)       ht_init(data, HT_INI_CAP)
 #define ht_init(data, siz) ht_init_((void **)&data, sizeof(*data), siz)
+#define ht_len(data)       (htptr(data)->len)
 static inline void *		/* function because returns the new vector */
 ht_init_(void **data, size_t els, size_t cap) /* for assigment operation in VEC */
 {
@@ -65,11 +66,11 @@ ht_init_(void **data, size_t els, size_t cap) /* for assigment operation in VEC 
 }
 
 /* gettable (element exists) predicate */
-#define ht_getp(ht, key) (htptr(ht)->keys[ht_find_idx(ht, key)] != (void*)0)
-#define ht_idxp(ht, idx) (htptr(ht)->keys[idx] != (void*)0)
-#define ht_get(ht, key)  (ht[ht_find_idx(ht, key)])
+#define ht_has(ht, key)      (htptr(ht)->keys[ht_gethash(ht, key)] != (void*)0)
+#define ht_has_hash(ht, idx) (htptr(ht)->keys[idx] != (void*)0)
+#define ht_get(ht, key)      (ht[ht_gethash(ht, key)])
 static inline size_t
-ht_find_idx(void *data, const char *key)
+ht_gethash(void *data, const char *key)
 {
 	uint64_t hash = hash_key(key);
 	size_t idx = (size_t)(hash & (uint64_t)(htptr(data)->cap - 1)); /* fast modulo */
@@ -80,10 +81,10 @@ ht_find_idx(void *data, const char *key)
 	return idx;
 }
 
-#define ht_del(ht, key)     ht_del_idx(ht, ht_find_idx(ht, key))
-#define ht_del_idx(ht, idx) ht_del_idx_(ht, sizeof(*ht), idx)
+#define ht_del(ht, key)      ht_del_hash(ht, ht_gethash(ht, key))
+#define ht_del_hash(ht, idx) ht_del_hash_(ht, sizeof(*ht), idx)
 static inline void *
-ht_del_idx_(void *data, size_t els, size_t idx)
+ht_del_hash_(void *data, size_t els, size_t idx)
 {
 	if (!htptr(data)->keys[idx]) return (void*)0;
 	free((char*)htptr(data)->keys[idx]);
@@ -100,7 +101,7 @@ ht_del_idx_(void *data, size_t els, size_t idx)
 	void *nht = ht_init_((void **)&nht, sizeof(*ht), htptr(ht)->cap << 1); \
 	for (size_t i = 0; i < htptr(ht)->cap; i++) {		               \
 		if (!htptr(ht)->keys[i]) continue;		               \
-		size_t dest = ht_find_idx(nht, htptr(ht)->keys[i]);            \
+		size_t dest = ht_gethash(nht, htptr(ht)->keys[i]);             \
 		htptr(nht)->keys[dest] = htptr(ht)->keys[i];		       \
 		memcpy((char*)nht + dest * sizeof(*ht), ht + i, sizeof(*ht));  \
 	}							               \
@@ -112,9 +113,9 @@ ht_del_idx_(void *data, size_t els, size_t idx)
 
 
 #define ht_set(ht, key, val) do {                                              \
-	size_t idx = ht_find_idx(ht, key);		                       \
+	size_t idx = ht_gethash(ht, key);		                       \
 	if (!htptr(ht)->keys[idx]) htptr(ht)->len += 2;			       \
-	ht_del_idx(ht, idx);						       \
+	ht_del_hash(ht, idx);						       \
 	htptr(ht)->keys[idx] = strdup(key);				       \
 	ht[idx] = val;					                       \
 	ht_ensure(ht);							       \
@@ -122,7 +123,7 @@ ht_del_idx_(void *data, size_t els, size_t idx)
 
 
 #define ht_free(ht) do {						       \
-	for (size_t i = 0; i < htptr(ht)->cap; i++) ht_del_idx(ht, i);         \
+	for (size_t i = 0; i < htptr(ht)->cap; i++) ht_del_hash(ht, i);        \
 	free(htptr(ht)->keys);						       \
 	free(htptr(ht));						       \
 } while (0)

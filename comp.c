@@ -8,7 +8,7 @@
 #include "read.h"
 
 
-static void compile_(Cell *cell, Chunk *chunk);
+static void compile_(Value cell, Chunk *chunk);
 
 #if 0
 static void
@@ -30,7 +30,9 @@ compilerest(Value cell, Chunk *chunk)
 static void
 compile_(Value cell, Chunk *chunk)
 {
-	if (!cell) return;
+	Value cell = sexp->cell;
+	Chunk *chunk = chunknew();
+	Comp *comp = compnew(chunk);
 
 	if (ATMP(CAR(cell))) {
 		if (CAR(cell)->type == A_SYM) {
@@ -44,6 +46,8 @@ compile_(Value cell, Chunk *chunk)
 		/* this is unreachable case right now */
 		assert(0 && "unreachable");
 	}
+	compfree(comp);
+	return chunk;
 
 }
 #endif
@@ -52,18 +56,23 @@ Chunk *
 compile(Sexp *sexp)
 {
 	Value cell = sexp->cell;
-	Chunk *chunk = chunknew();
-	Comp *comp = compnew(chunk);
+	Env *env = envnew(nil);
+
 	/* compile_(cell, chunk); */
-	emit(comp, OP_LOAD_CONS, (Range){0, 0});
-	emitcons(comp, TO_INT(3), (Range){0, 0});
-	/*
-	ht_set(comp->env->lexbind, "val",3);
-	printf(";;; VALUE: %d\n", ht_find_idx(comp->env->lexbind, "val"));
-	*/
-	emitbind(comp, "val", (Range){0, 0});
-	emitload(comp, "val", (Range){0, 0});
-	emit(comp, OP_RET, (Range){0, 0});
-	compfree(comp);
-	return chunk;
+
+	emit(env, OP_CONS, (Range){0, 0});
+	emitcons(env, TO_INT(3), (Range){0, 0});
+	emitbind(env, "1", (Range){0, 0});
+
+	emit(env, OP_CONS, (Range){0, 0});
+	emitcons(env, TO_INT(-190), (Range){0, 0});
+	emitbind(env, "2", (Range){0, 0});
+
+	emit(env, OP_CONS, (Range){0, 0});
+	emitcons(env, TO_DUB(2137), (Range){0, 0});
+	emitbind(env, "3", (Range){0, 0});
+
+	emitload(env, "2", (Range){0, 0});
+	emit(env, OP_RET, (Range){0, 0});
+	return env->chunk;
 }
