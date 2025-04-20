@@ -5,7 +5,7 @@
 #include "types/ht.h"
 */
 
-Chunk *compile(Sexp *sexp);
+Chunk *compile(Env *env, Sexp *sexp);
 Range whereis(Chunk *chunk, ptrdiff_t offset);
 void chunkfree(Chunk *chunk);
 Chunk *chunknew(void);

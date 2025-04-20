@@ -10,7 +10,6 @@
 
 #define STACK_MAX 4096
 #define FRAME_MAX 4096
-#define VM_TRACE 1
 
 /*;; Glorious Lisp Virtual Machine (GLVM) ;;*/
 typedef enum {
@@ -31,6 +30,7 @@ typedef struct {
 
 typedef struct {
 	uint8_t *ip;
+	Env *env;
 	Chunk *chunk;
 	Frame frames[FRAME_MAX];
 	Value stack[STACK_MAX];
@@ -43,6 +43,7 @@ static VM vm;
 
 #define fetch() (*vm.ip++)
 #define imm() (vm.chunk->conspool[fetch()])
+#define istoplevel() (vm.fp == vm.frames)
 
 void
 enter()
@@ -66,7 +67,9 @@ vminit()
 	vm.sp = vm.stack;
 	vm.ip = nil;
 	vm.fp = vm.frames - 1;
+	vm.env = nil;
 	ht_ini(vm.dynamic);
+	envnew(&vm.env);
 	enter();
 }
 
@@ -101,6 +104,15 @@ printstack()
 	}
 	printf("\n;;; STACK END\n");
 }
+/*
+  (define x 3)
+  x ;; should be delete from stack or other locals won't work
+  (define x
+  (lambda (x)
+      x))
+
+
+ */
 
 EvalErr
 run()
@@ -115,7 +127,7 @@ run()
 #endif
 		uint8_t opcode;
 		switch (opcode = fetch()) {
-		case OP_BIND: {
+		case OP_BIND: {	/* this doesn't really do anything because 'slot' is already stack top */
 			size_t slot = AS_INT(imm());
 			vm.fp->bsp[slot] = peek();
 			break;
@@ -147,15 +159,18 @@ run()
 			vm.ip = AS_FUN(fun)->body->code;
 			vm.chunk = AS_FUN(fun)->body;
 			vm.fp->bsp -= AS_FUN(fun)->arrity;
-			printf("DIFF SP: %d\n", vm.sp - vm.fp->bsp);
 			break;
 		}
 		case OP_RET: {
-			leave();
-			if (vm.ip == nil)  {
-				printf("; TERMINATING\n");
+			if (istoplevel())  {
+				printf("; OK\n");
+				puts(valuestr(peek()));
 				return OK;
 			}
+			printf("; RETURNING\n");
+			Value res = peek();
+			leave();
+			push(res);
 			break;
 		}
 		default: assert(0 && "unreachable");
@@ -172,18 +187,20 @@ eval(Sexp *sexp)
 {
 	EvalErr err;
 	Chunk *chunk;
-	chunk = compile(sexp);
+	chunk = compile(vm.env, sexp);
 	if (!chunk) {
 		err = COMPILE_ERR;
 		return err;
 		/* goto RET; */
 	}
 	vm.chunk = chunk;
-	vm.ip = chunk->code;
+	if (!vm.ip) vm.ip = chunk->code; /* there is bug because chunk->code is reallocated this points to wrong address */
+#ifdef VM_TRACE
 	decompile(chunk, "EXECUTING");
+#endif
 	err = run();
 RET:
-	chunkfree(chunk);
+	/* chunkfree(chunk); */
 	return err;
 }
 

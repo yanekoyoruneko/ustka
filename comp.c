@@ -54,8 +54,8 @@ compile_(Env *env, Value cell)
 				for (Value arg = CAR(CDR(cell)); !NILP(arg); arg = CDR(arg), arrity++) {
 					makebind(env, AS_PTR(CAR(arg)));
 				}
-				printf("arrity = %d\n", arrity);
-				printes_(CDR(CDR(cell)));
+				/* printf("arrity = %d\n", arrity); */
+				/* printes_(CDR(CDR(cell))); */
 				compile_(env, CAR(CDR(CDR(cell))));
 				emit(env, OP_RET, (Range){0, 0});
 				Chunk *body = envend(&env);
@@ -63,6 +63,9 @@ compile_(Env *env, Value cell)
 				emit(env, OP_CONS, (Range){0, 0});
 				emitcons(env, makefun(body, arrity), (Range){0, 0}); /* this is leaking */
 				return;
+			} else if (!strcmp(AS_PTR(CAR(cell)), "define")) {
+				compile_(env, CAR(CDR(CDR(cell))));
+				emitbind(env, AS_PTR(CAR(CDR(cell))), (Range){0, 0});
 			} else {
 				compilerest(env, CDR(cell));
 				if (emitload(env, AS_PTR(CAR(cell)), (Range){0, 0}) == SIZE_MAX) {
@@ -85,25 +88,9 @@ compile_(Env *env, Value cell)
 }
 
 Chunk *
-compile(Sexp *sexp)
+compile(Env *env, Sexp *sexp)
 {
-	Value cell = sexp->cell;
-	Env *env = envnew(nil);
-	compile_(env, cell);
-
-	/* emit(env, OP_CONS, (Range){0, 0}); */
-	/* emitcons(env, TO_INT(3), (Range){0, 0}); */
-	/* emitbind(env, "1", (Range){0, 0}); */
-
-	/* emit(env, OP_CONS, (Range){0, 0}); */
-	/* emitcons(env, TO_INT(-190), (Range){0, 0}); */
-	/* emitbind(env, "2", (Range){0, 0}); */
-
-	/* emit(env, OP_CONS, (Range){0, 0}); */
-	/* emitcons(env, TO_DUB(2137), (Range){0, 0}); */
-	/* emitbind(env, "3", (Range){0, 0}); */
-
-	/* emitload(env, "2", (Range){0, 0}); */
+	compile_(env, sexp->cell);
 	emit(env, OP_RET, (Range){0, 0});
-	return envend(&env);
+	return env->chunk;
 }
