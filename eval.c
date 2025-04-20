@@ -142,10 +142,12 @@ run()
 		case OP_MUL: BIN_OP(*); break;
 		case OP_DIV: BIN_OP(/); break;
 		case OP_CALL: {
-			enter();
 		        Value fun = pop();
+			enter();
 			vm.ip = AS_FUN(fun)->body->code;
+			vm.chunk = AS_FUN(fun)->body;
 			vm.fp->bsp -= AS_FUN(fun)->arrity;
+			printf("DIFF SP: %d\n", vm.sp - vm.fp->bsp);
 			break;
 		}
 		case OP_RET: {
@@ -179,7 +181,7 @@ eval(Sexp *sexp)
 	vm.chunk = chunk;
 	vm.ip = chunk->code;
 	decompile(chunk, "EXECUTING");
-	/* err = run(); */
+	err = run();
 RET:
 	chunkfree(chunk);
 	return err;

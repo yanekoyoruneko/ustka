@@ -56,12 +56,12 @@ compile_(Env *env, Value cell)
 				}
 				printf("arrity = %d\n", arrity);
 				printes_(CDR(CDR(cell)));
-				compile_(env, CDR(CDR(cell)));
+				compile_(env, CAR(CDR(CDR(cell))));
 				emit(env, OP_RET, (Range){0, 0});
 				Chunk *body = envend(&env);
 
 				emit(env, OP_CONS, (Range){0, 0});
-				emitcons(env, makefun(body, arrity), (Range){0, 0});
+				emitcons(env, makefun(body, arrity), (Range){0, 0}); /* this is leaking */
 				return;
 			} else {
 				compilerest(env, CDR(cell));
@@ -73,7 +73,7 @@ compile_(Env *env, Value cell)
 		}
 	} else if (CELP(CAR(cell))) {
 		for (Value arg = CDR(cell); !NILP(arg); arg = CDR(arg)) {
-			compile_(env, arg);
+			compile_(env, CAR(arg));
 		}
 		compile_(env, CAR(cell));
 		emit(env, OP_CALL, (Range){0, 0});
@@ -105,5 +105,5 @@ compile(Sexp *sexp)
 
 	/* emitload(env, "2", (Range){0, 0}); */
 	emit(env, OP_RET, (Range){0, 0});
-	return env->chunk;
+	return envend(&env);
 }
