@@ -28,6 +28,7 @@ Env *
 shadow(Env **env)
 {
 	Env *new = malloc(sizeof(Env));
+	new->popstack = 1;
 	new->chunk = chunknew();
 	ht_ini(new->binds);
 	if (env) {
@@ -97,6 +98,7 @@ makebind(Env *env, const char *name)
 {
 	size_t hash = ht_gethash(env->binds, name);
 	if (ht_has_hash(env->binds, hash)) return env->binds[hash];
+	printf("new bind %s", name);
 	int len = ht_len(env->binds);
 	ht_set(env->binds, name, len);
 	return len;
@@ -137,8 +139,12 @@ setjump(Env *env, size_t jmp)
 size_t
 emitbind(Env *env, const char *name, Range pos)
 {
+	int isnew = ht_len(env->binds);
 	size_t bind = makebind(env, name);
+	isnew -= ht_len(env->binds);
 	emit(env, OP_BIND, pos);
 	emitcons(env, TO_INT(bind), pos);
+	printf("BIND %d %d\n", bind, ht_len(env->binds));
+	if (isnew) emitpush(env, NIL, pos);	/* so the slot won't be pooped */
 	return bind;
 }

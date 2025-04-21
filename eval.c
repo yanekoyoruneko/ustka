@@ -131,9 +131,10 @@ run()
 #endif
 		uint8_t opcode;
 		switch (opcode = fetch()) {
-		case OP_BIND: {	/* this doesn't really do anything because 'slot' is already stack top */
-			/* size_t slot = AS_INT(imm()); */
-			/* vm.fp->bsp[slot] = peek(); */
+		case OP_BIND: {
+			size_t slot = AS_INT(imm());
+			Value val = peek();
+			vm.fp->bsp[slot] = val;
 			break;
 		}
 		case OP_LOAD: {
@@ -191,7 +192,7 @@ run()
 		case OP_RET: {
 			if (toplevel())  {
 				printf("; OK\n");
-				puts(valuestr(peek()));
+				puts(valuestr(pop()));
 				return OK;
 			}
 			printf("; RETURNING\n");
