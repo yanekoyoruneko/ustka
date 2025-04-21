@@ -61,6 +61,8 @@
 #define METP(v) ((v.as_uint64 & NPTR_TAG_MASK) == MET_MASK)
 #define NUMP(v) (INTP(v) || DUBP(v))
 #define NILP(v) ((v).as_uint64 == NIL_MASK)
+#define IS_F(v) ((v).as_uint64 == F_MASK)
+#define IS_T(v) ((v).as_uint64 == T_MASK)
 #define ATMP(v) (!CELP(v))
 
 /* get value */
@@ -178,6 +180,14 @@ econs(Arena *arena, Value a, Value b)
 	CAR(cell) = a;
 	CDR(cell) = b;
 	return cell;
+}
+
+static inline int
+length(Value c)
+{
+	int l;
+	for (Value it = c; !NILP(it); it = CDR(it), l++);
+	return l;
 }
 
 static inline const char *

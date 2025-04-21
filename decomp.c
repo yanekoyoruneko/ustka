@@ -69,12 +69,15 @@ decompile_op_(Chunk *chunk, ptrdiff_t offset)
 	switch (instr) {
 	case OP_LOAD: return op_comp(chunk, "LOAD", offset, 1);
 	case OP_BIND: return op_comp(chunk, "BIND", offset, 1);
-	case OP_CONS:return op_comp(chunk, "LOAD_CONS", offset, 1);
+	case OP_PUSH:   return op_comp(chunk, "PUSH", offset, 1);
 	case OP_RET:      return op_basic("RET", offset);
 	case OP_NEG:      return op_basic("NEG", offset);
 	case OP_ADD:      return op_basic("ADD", offset);
 	case OP_SUB:      return op_basic("SUB", offset);
 	case OP_MUL:      return op_basic("MUL", offset);
+	case OP_POP:      return op_basic("POP", offset);
+	case OP_JF:      return op_basic("JF", offset);
+	case OP_EQ:      return op_basic("EQ", offset);
 	case OP_CALL:      return op_basic("CALL", offset);
 	case OP_DIV:      return op_basic("DIV", offset);
 	default:

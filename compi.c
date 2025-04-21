@@ -25,7 +25,7 @@ chunknew(void)
 }
 
 Env *
-envnew(Env **env)
+shadow(Env **env)
 {
 	Env *new = malloc(sizeof(Env));
 	new->chunk = chunknew();
@@ -40,7 +40,7 @@ envnew(Env **env)
 }
 
 Chunk *
-envend(Env **env)
+retenv(Env **env)
 {
 	ht_free((*env)->binds);
 	/* chunkfree((*env)->chunk); */
@@ -102,6 +102,13 @@ makebind(Env *env, const char *name)
 	return len;
 }
 
+void
+emitpush(Env *env, Value val, Range pos)
+{
+	emit(env, OP_PUSH, pos);
+	emitcons(env, val, pos);
+}
+
 size_t
 emitload(Env *env, const char *name, Range pos)
 {
@@ -110,6 +117,20 @@ emitload(Env *env, const char *name, Range pos)
 	emit(env, OP_LOAD, pos);
 	emitcons(env, TO_INT(bind), pos);
 	return bind;
+}
+
+uint8_t *
+emitjump(Env *env, Range pos)
+{
+	emit(env, OP_JF, pos);
+	emit(env, 0xff, pos);
+	return env->chunk->code - 1;
+}
+
+void
+setjump(uint8_t *jmp, uint8_t off)
+{
+	*jmp = off;
 }
 
 size_t
