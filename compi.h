@@ -17,6 +17,7 @@ typedef enum {
 	OP_MUL,
 	OP_EQ,
 	OP_JF,
+	OP_JMP,
 	OP_DIV,
 	OP_POP,
 	OP_CALL,
@@ -33,5 +34,5 @@ size_t   makebind(Env *env, const char *name);
 size_t   emitload(Env *env, const char *name, Range pos);
 size_t   emitbind(Env *env, const char *name, Range pos);
 void     emitpush(Env *env, Value val, Range pos);
-uint8_t *emitjump(Env *env, Range pos);
-void     setjump(uint8_t *jmp, uint8_t off);
+size_t  emitjump(Env *env, int jmp_op, Range pos);
+void     setjump(Env *env, size_t jmp);

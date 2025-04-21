@@ -15,17 +15,27 @@ enum {
 static void compile_(Env *env, Value cell);
 
 static void
+evalself(Env *env, Value cell)
+{
+	if (INTP(cell)) {
+		emitpush(env, cell, (Range){0, 0});
+		return;
+	}
+	if (SYMP(cell)) {
+		emitload(env, AS_PTR(cell), (Range){0, 0});
+		return;
+	}
+
+	assert(0 && "unreachable");
+}
+
+static void
 compilerest(Env *env, Value cell)
 {
 	if (NILP(cell)) return;
 
 	if (ATMP(CAR(cell))) {
-		/* here emit push instructions for all the literal values */
-		if (INTP(CAR(cell))) {
-			emitpush(env, CAR(cell), (Range){0, 0});
-		} else if (SYMP(CAR(cell))) {
-			emitload(env, AS_PTR(CAR(cell)), (Range){0, 0});
-		}
+		evalself(env, CAR(cell));
 		compilerest(env, CDR(cell));
 		return;
 	}
@@ -46,7 +56,7 @@ compile_(Env *env, Value cell)
 	if (NILP(cell)) return;
 
 	if (ATMP(cell)) {
-		compilerest(env, cell);
+		evalself(env, cell);
 		return;
 	}
 
@@ -78,6 +88,7 @@ compile_(Env *env, Value cell)
 
 				Chunk *body = retenv(&env);
 				emitpush(env, makefun(body, arrity), (Range){0, 0}); /* this is leaking */
+				printf("yes\n");
 				return;
 			}
 
@@ -92,9 +103,13 @@ compile_(Env *env, Value cell)
 			if (!strcmp(AS_PTR(CAR(cell)), "if")) {
 				if (length(cell) != 4)     return;
 				compile_(env, CAR(CDR(cell)));
-				emitjump(env, (Range){0, 0});
+				size_t jf = emitjump(env, OP_JF, (Range){0, 0});
+				printes_(CDR(CDR(cell)));
 				compile_(env, CAR(CDR(CDR(cell))));
+				size_t end =  emitjump(env, OP_JMP, (Range){0, 0});
+				setjump(env, jf);
 				compile_(env, CAR(CDR(CDR(CDR(cell)))));
+				setjump(env, end);
 				return;
 			}
 

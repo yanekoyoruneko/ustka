@@ -119,18 +119,19 @@ emitload(Env *env, const char *name, Range pos)
 	return bind;
 }
 
-uint8_t *
-emitjump(Env *env, Range pos)
+size_t
+emitjump(Env *env, int jmp_op, Range pos)
 {
-	emit(env, OP_JF, pos);
+	emit(env, jmp_op, pos);
 	emit(env, 0xff, pos);
-	return env->chunk->code - 1;
+	return vec_len(env->chunk->code) - 1;
 }
 
 void
-setjump(uint8_t *jmp, uint8_t off)
+setjump(Env *env, size_t jmp)
 {
-	*jmp = off;
+	env->chunk->code[jmp] =  vec_len(env->chunk->code) - (jmp + 1);
+	printf("jump set %d\n", env->chunk->code[jmp]);
 }
 
 size_t

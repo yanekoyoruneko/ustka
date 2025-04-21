@@ -185,7 +185,7 @@ econs(Arena *arena, Value a, Value b)
 static inline int
 length(Value c)
 {
-	int l;
+	int l = 0;
 	for (Value it = c; !NILP(it); it = CDR(it), l++);
 	return l;
 }

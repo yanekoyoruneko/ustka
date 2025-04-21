@@ -154,10 +154,15 @@ run()
 			break;
 		}
 		case OP_POP: pop(); break;
-		case OP_JF: {
+		case OP_JMP: {
+			int off = fetch();
+			vm.ip += off;
+			break;
+		} case OP_JF: {
 			Value a = pop();
 			if (IS_F(a)) {
-				vm.ip += AS_INT(imm());
+				int off = fetch();
+				vm.ip += off;
 				break;
 			}
 			fetch();
