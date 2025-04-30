@@ -178,7 +178,7 @@ skipcom(Reader *reader)
 }
 
 static Token
-nextitem(Arena *arena, Reader *reader, Value *val)
+nextitem(Arena *arena, Reader *reader, Value *val, Range *loc)
 {
 	char chr;
 	switch (chr = skipcom(reader)) {
@@ -195,14 +195,14 @@ nextitem(Arena *arena, Reader *reader, Value *val)
 		return EOF;
 	case '"': {		/* todo: test string */
 		VEC(char, str);
-		/* CELL_LEN(cell) */
-		readstr(reader, &str); // + 1 /* 1+ for quote */;
+		loc->at = reader->cursor - 1;
+		loc->len = readstr(reader, &str) + 1; /* 1+ for quote */
 		if (feof(reader->input)) {
 			vec_free(str);
 			reader->err = (ReadErr){EOF_ERR, reader->cursor};
 			return ERR;
 		}
-		*val = TO_STR(new(arena, strlen(str) + 1));
+		*val = TO_STR(enew(arena, strlen(str) + 1));
 		strcpy(AS_PTR(*val), str);
 		vec_free(str);
 		return VAL;
@@ -210,8 +210,8 @@ nextitem(Arena *arena, Reader *reader, Value *val)
 	default:		/* todo: add double */
 		rungetc(reader, chr);
 		VEC(char, sym);
-		/* CELL_LEN(cell) = */
-		readsym(reader, &sym);
+		loc->at = reader->cursor;
+		loc->len = readsym(reader, &sym);
 		char *endptr;
 		/* if looks like number it's number */
 		*val = TO_INT(strtol(sym, &endptr, 10));
@@ -219,7 +219,7 @@ nextitem(Arena *arena, Reader *reader, Value *val)
 			vec_free(sym);
 			return VAL;
 		}
-		*val = TO_SYM(new(arena, strlen(sym) + 1));
+		*val = TO_SYM(enew(arena, strlen(sym) + 1));
 		strcpy(AS_PTR(*val), sym);
 		vec_free(sym);
 		return VAL;
@@ -229,13 +229,14 @@ nextitem(Arena *arena, Reader *reader, Value *val)
 
 /* ;; READ SEXP ;; */
 /* -es stands for (e)S-expression */
-static Value reades_(Arena *arena, Reader *reader);
+static Value reades_(Arena *arena, Reader *reader, Range *loc);
 
 static void
 discardsexp(Arena *arena, Reader *reader)
 { /* Discard everything until the current sexp ends; closing KET is found. */
 	Value item;
 	Token tk;
+	Range loc;
 	ReadErr olderr = reader->err;
 	int depth = 0;
 	/* because NOTHING_AFTER_DOT_ERR consumes KET synchronization can be omited */
@@ -243,7 +244,7 @@ discardsexp(Arena *arena, Reader *reader)
 	    reader->err.type == UNEXPECTED_EOF_ERR ||
 	    reader->err.type == NOTHING_AFTER_DOT_ERR)
 		return;
-	while (depth >= 0 && (tk = nextitem(arena, reader, &item)) != EOF) {
+	while (depth >= 0 && (tk = nextitem(arena, reader, &item, &loc)) != EOF) {
 		switch (tk) {
 		case BRA: depth++; break;
 		case KET: depth--; break;
@@ -254,21 +255,23 @@ discardsexp(Arena *arena, Reader *reader)
 }
 
 static Value /* todo: implement all tokens / make area size fixed? */
-readrest(Arena *arena, Reader *reader)
+readrest(Arena *arena, Reader *reader, Range *sexploc)
 {
 	Value tl = NIL;
+	Value ltl = NIL;	/* location tail */
 	Value hd = NIL;
 	Value errel = NIL;
-	size_t begcur = reader->cursor - 1;
+	Range loc;
 	Token tk;
 	Value item;
-	while ((tk = nextitem(arena, reader, &item)) != KET) {
+	sexploc->at = reader->cursor - 1;
+	while ((tk = nextitem(arena, reader, &item, &loc)) != KET) {
 		switch (tk) {
 		case EOF:	/* this is unexpected EOF, make it unexpected */
 			reader->err.type = UNEXPECTED_EOF_ERR;
 			return NIL;
 		case BRA:
-			item = readrest(arena, reader);
+			item = readrest(arena, reader, &loc);
 			if (reader->err.type) {
 				discardsexp(arena, reader);
 				return NIL;
@@ -283,7 +286,9 @@ readrest(Arena *arena, Reader *reader)
 				return NIL;
 			}
 			size_t prevcur = reader->cursor - 1;
-			CDR(tl) = reades_(arena, reader);
+			CDR(tl) = reades_(arena, reader, &loc);
+			Value r = cons(arena, TO_INT(loc.at), TO_INT(loc.len));
+			CDR(ltl) = r;
 			if (reader->err.type) {
 				if (reader->err.type == UNMATCHED_KET_ERR) {
 					reader->err = (ReadErr){
@@ -299,39 +304,53 @@ readrest(Arena *arena, Reader *reader)
 			 * consumed by `discardsexp' on synchronization
 			 */
 			prevcur = reader->err.at;
-			if (!NILP(errel = reades_(arena, reader))) {
+			if (!NILP(errel = reades_(arena, reader, &loc))) {
 				reader->err = (ReadErr){
 					DOT_MANY_FOLLOW_ERR,
-					0
-					/* CEL_AT(errel), */
+					loc.at
 				};
 				return NIL;
 			}
 			if (reader->err.type != UNMATCHED_KET_ERR)
 				return NIL; /* propagate further same error */
 			reader->err = (ReadErr){OK, prevcur}; /* proper sexp */
-			if (!NILP(hd)) CEL_LEN(hd) = reader->cursor - begcur;
+			if (!NILP(hd)) sexploc->len = reader->cursor - sexploc->at;
 			return hd;
 		default: break;
 		}
-		Value cell = econs(arena, item, NIL);
-		CEL_AT(cell) = begcur;
-		if (NILP(hd)) hd = cell;
-		else CDR(tl) = cell;
-		tl = cell;
+		Value cell, cloc;
+		Value r = cons(arena, TO_INT(loc.at), TO_INT(loc.len));
+		if (NILP(hd)) {
+			cell = econs(arena, item, NIL);
+			cloc = CEL_LOC(cell);
+			CAR(cloc) = r;
+			CDR(cloc) = NIL;
+		}
+		else {
+			cell = cons(arena, item, NIL);
+			cloc = cons(arena, r, NIL);
+		}
+
+		if (NILP(hd))  hd = cell;
+		else {
+			CDR(tl)  = cell;
+			CDR(ltl) = cloc;
+		}
+		tl  = cell;
+		ltl = cloc;
 	}
-	if (!NILP(hd)) CEL_LEN(hd) = reader->cursor - begcur;
+	if (!NILP(hd)) sexploc->len = reader->cursor - sexploc->at;
 	return hd;
 }
 
 static Value
-reades_(Arena *arena, Reader *reader)
+reades_(Arena *arena, Reader *reader, Range *loc)
 {
 	Value item;
 	Token tk;
-	switch (tk = nextitem(arena, reader, &item)) {
+	switch (tk = nextitem(arena, reader, &item, loc)) {
 	case BRA: {
-		Value cell = readrest(arena, reader);
+		Value cell = readrest(arena, reader, loc);
 		if (reader->err.type) discardsexp(arena, reader);
 		return cell;
 	}
@@ -351,7 +370,7 @@ reades(Reader *reader)
 	sexp->arena = aini();	/* imagine trying to clear memory without arena */
 	sexp->fname = reader->fname;
 	reader->err = (ReadErr){OK, reader->cursor};
-	sexp->cell = reades_(sexp->arena, reader);
+	sexp->cell = reades_(sexp->arena, reader, &sexp->loc);
 	return sexp;
 }
 

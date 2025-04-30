@@ -85,7 +85,7 @@
 /* cell */
 #define CAR(p)    (AS_CEL(p)->car_)
 #define CDR(p)    (AS_CEL(p)->cdr_)
-#define CEL_LOC(p) (*(Range*)(AS_CEL(p)+1))
+#define CEL_LOC(p) (TO_CEL(((Cell*)(AS_CEL(p))-1)))
 #define CEL_LEN(p) (CEL_LOC(p).len)
 #define CEL_AT(p)  (CEL_LOC(p).at)
 
@@ -111,8 +111,8 @@
 #define CHECK_TYPE(type, val) (!type(val) ? (TYPE_ERR(#type, val), 1) : 0)
 
 
-#define RANGEFMT "|%lu:%lu|"
-#define RANGEP(range) range.at, range.len
+#define RANGEFMT "|%d:%d|"
+#define RANGEP(range) AS_INT(CAR(range)), AS_INT(CDR(range))
 
 typedef struct {
 	size_t at;
@@ -150,9 +150,15 @@ typedef struct {
 } Fun;
 
 typedef struct {
+	char *name;
+	Value bind;
+} Sym;
+
+typedef struct {
 	const char *fname;
 	Arena *arena;
 	Value cell;
+	Range loc;
 } Sexp;
 
 static inline Value
@@ -176,10 +182,16 @@ makefun(Chunk *body, int arrity)
 static inline Value
 econs(Arena *arena, Value a, Value b)
 {
-	Value cell = TO_CEL(new(arena, sizeof(Cell) + sizeof(Range)));
+	Value cell = TO_CEL((Cell*)new(arena, sizeof(Cell) + sizeof(cell))+1);
 	CAR(cell) = a;
 	CDR(cell) = b;
 	return cell;
+}
+
+static inline void *
+enew(Arena *arena, size_t siz)
+{
+	return (Range*)new(arena, sizeof(Range) + siz)+1;
 }
 
 static inline int
@@ -208,9 +220,7 @@ valuestr(Value val)
 inline static void
 printes_(Value cell) {
 	if (CELP(cell)) {
-#ifdef PRINTES_LOC
-		printf(RANGEFMT, RANGEP(CEL_LOC(cell)));
-#endif
+		/* printf(RANGEFMT, RANGEP(CAR(cloc))); */
 		putchar('(');
 		printes_(CAR(cell));
 		while (CELP(CDR(cell)))  {
@@ -225,7 +235,11 @@ printes_(Value cell) {
 		putchar(')');
 		return;
 	}
+	/* printf(RANGEFMT, RANGEP(cloc)); */
 	printf("%s", valuestr(cell));
 }
 
-inline static void printes(Sexp *sexp) { printes_(sexp->cell); }
+inline static void printes(Sexp *sexp) {
+	printes_(sexp->cell);
+	printes_(CEL_LOC(sexp->cell));
+}
